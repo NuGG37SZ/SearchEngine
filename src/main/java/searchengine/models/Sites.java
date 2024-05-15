@@ -7,6 +7,8 @@ import lombok.Setter;
 import searchengine.enums.Status;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -32,4 +34,8 @@ public class Sites {
 
     @Column(name = "name", nullable = false, length = 255)
     private String name;
+
+    @OneToMany(mappedBy = "site", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Page> pages = new ArrayList<>();
 }
+

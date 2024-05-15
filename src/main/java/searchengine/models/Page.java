@@ -15,7 +15,7 @@ public class Page {
     private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "site_id", nullable = false)
+    @JoinColumn(name = "site_id")
     private Sites site;
 
     @Column(nullable = false)
@@ -24,8 +24,7 @@ public class Page {
     @Column(nullable = false)
     private Integer code;
 
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
 }
