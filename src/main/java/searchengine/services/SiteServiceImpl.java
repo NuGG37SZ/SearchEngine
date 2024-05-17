@@ -12,7 +12,6 @@ import searchengine.repository.SiteRepository;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ForkJoinPool;
@@ -24,8 +23,8 @@ public class SiteServiceImpl implements SiteService {
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
     private final SitesList sitesList;
-    private IndexResponse response = new IndexResponse();
-    private ForkJoinPool forkJoinPool = new ForkJoinPool();
+    private final IndexResponse response = new IndexResponse();
+    private final ForkJoinPool forkJoinPool = new ForkJoinPool();
 
     public SiteServiceImpl(SiteRepository siteRepository, PageRepository pageRepository, SitesList sitesList) {
         this.siteRepository = siteRepository;
@@ -71,7 +70,6 @@ public class SiteServiceImpl implements SiteService {
                 response.setResult(false);
                 response.setError(e.getMessage());
             }
-
         }
         response.setError("");
         response.setResult(true);
