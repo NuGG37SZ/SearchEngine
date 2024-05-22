@@ -13,8 +13,6 @@ import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.RecursiveAction;
@@ -30,7 +28,8 @@ public class SiteMapRecursiveAction extends RecursiveAction {
     private final ConcurrentSkipListSet<String> processedLinks;
 
     public SiteMapRecursiveAction(Sites site, String url, PageRepository pageRepository,
-                                  SiteRepository siteRepository, ConcurrentSkipListSet<String> processedLinks) {
+                                  SiteRepository siteRepository, ConcurrentSkipListSet<String> processedLinks)
+    {
         this.site = site;
         this.url = url;
         this.pageRepository = pageRepository;
@@ -40,8 +39,10 @@ public class SiteMapRecursiveAction extends RecursiveAction {
 
     @Override
     protected void compute() {
-        Page page = new Page();
-        page.setSite(site);
+        if (processedLinks.contains(url)) {
+            return;
+        }
+        processedLinks.add(url);
 
         try {
             sleep(150);
@@ -54,6 +55,8 @@ public class SiteMapRecursiveAction extends RecursiveAction {
 
             Optional<Page> existingPage = pageRepository.findBySiteAndPath(site, url);
             if (existingPage.isEmpty()) {
+                Page page = new Page();
+                page.setSite(site);
                 page.setCode(document.connection().response().statusCode());
                 page.setContent(document.html());
                 page.setPath(url);
@@ -61,16 +64,14 @@ public class SiteMapRecursiveAction extends RecursiveAction {
             }
 
             List<SiteMapRecursiveAction> taskList = new ArrayList<>();
-
             for (Element element : elements) {
                 String link = element.absUrl("href");
                 log.info("link: {}", link);
 
                 if (!link.contains("#") && !isFile(link) && link.startsWith(site.getUrl()) &&
                         !processedLinks.contains(link)) {
-                    processedLinks.add(link);
-                    SiteMapRecursiveAction siteMapRecursiveAction =
-                            new SiteMapRecursiveAction(site, link, pageRepository, siteRepository, processedLinks);
+                    SiteMapRecursiveAction siteMapRecursiveAction = new SiteMapRecursiveAction(site, link,
+                            pageRepository, siteRepository, processedLinks);
                     siteMapRecursiveAction.fork();
                     taskList.add(siteMapRecursiveAction);
                 }
