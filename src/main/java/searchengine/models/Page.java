@@ -1,9 +1,11 @@
-
 package searchengine.models;
 
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.util.HashSet;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -27,4 +29,6 @@ public class Page {
     @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
+    @OneToMany(mappedBy = "page", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Indexed> indexes = new HashSet<>();
 }

@@ -16,7 +16,6 @@ import java.util.List;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ForkJoinPool;
 
-
 @Slf4j
 @Service
 public class SiteServiceImpl implements SiteService {
@@ -54,21 +53,11 @@ public class SiteServiceImpl implements SiteService {
         siteRepository.saveAll(siteList);
 
         for (Sites sites : siteList) {
-            ConcurrentSkipListSet<String> processedLinks = new ConcurrentSkipListSet<>();
-            SiteMapRecursiveAction task =
-                    new SiteMapRecursiveAction(sites, sites.getUrl(), pageRepository, siteRepository, processedLinks);
-            forkJoinPool.execute(task);
-            try {
-                task.get();
-                sites.setStatus(Status.INDEXED);
-                sites.setStatusTime(LocalDateTime.now());
-                siteRepository.save(sites);
-            } catch (Exception e) {
-                sites.setStatus(Status.FAILED);
-                sites.setLastError(e.getMessage());
-                siteRepository.save(sites);
-                response.setResult(false);
-                response.setError(e.getMessage());
+            if (!forkJoinPool.isShutdown() && !forkJoinPool.isTerminating()) {
+                ConcurrentSkipListSet<String> processedLinks = new ConcurrentSkipListSet<>();
+                SiteMapRecursiveAction task = new SiteMapRecursiveAction(sites, sites.getUrl(), pageRepository,
+                        siteRepository, processedLinks);
+                forkJoinPool.execute(task);
             }
         }
         response.setError("");
@@ -78,8 +67,20 @@ public class SiteServiceImpl implements SiteService {
 
     @Override
     public IndexResponse stopIndexing() {
-        return null;
+        try {
+            forkJoinPool.shutdownNow();
+            response.setError("");
+            response.setResult(true);
+        } catch (Exception e) {
+            response.setError("Ошибка при остановке индексации: " + e.getMessage());
+            response.setResult(false);
+        }
+        return response;
     }
 
+    @Override
+    public IndexResponse indexPage() {
+        return null;
+    }
 }
 

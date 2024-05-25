@@ -13,6 +13,7 @@ import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.RecursiveAction;
@@ -51,7 +52,7 @@ public class SiteMapRecursiveAction extends RecursiveAction {
                     .timeout(5000)
                     .followRedirects(false);
             Document document = connection.get();
-            Elements elements = document.select("body").select("a");
+            Elements elements = document.select("a[href]");
 
             Optional<Page> existingPage = pageRepository.findBySiteAndPath(site, url);
             if (existingPage.isEmpty()) {
@@ -69,7 +70,8 @@ public class SiteMapRecursiveAction extends RecursiveAction {
                 log.info("link: {}", link);
 
                 if (!link.contains("#") && !isFile(link) && link.startsWith(site.getUrl()) &&
-                        !processedLinks.contains(link)) {
+                        !processedLinks.contains(link) && element.tagName().equals("a"))
+                {
                     SiteMapRecursiveAction siteMapRecursiveAction = new SiteMapRecursiveAction(site, link,
                             pageRepository, siteRepository, processedLinks);
                     siteMapRecursiveAction.fork();
@@ -80,6 +82,10 @@ public class SiteMapRecursiveAction extends RecursiveAction {
             for (SiteMapRecursiveAction task : taskList) {
                 task.join();
             }
+
+            site.setStatus(Status.INDEXED);
+            site.setStatusTime(LocalDateTime.now());
+            siteRepository.save(site);
         } catch (InterruptedException | IOException e) {
             site.setLastError(e.getMessage());
             site.setStatus(Status.FAILED);

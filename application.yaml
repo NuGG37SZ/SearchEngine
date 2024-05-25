@@ -12,13 +12,12 @@
         ddl-auto: create
       show-sql: true
 
-
   # example value
 
   indexing-settings:
     sites:
-      - url: https://sendel.ru/
-        name: sendel.ru
+      - url: https://dombulgakova.ru/
+        name: dombulgakova.ru
       - url:  https://nikoartgallery.com/
         name: nikoartgallery.com
 
