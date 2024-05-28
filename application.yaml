@@ -9,7 +9,7 @@
     jpa:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
-        ddl-auto: create
+        ddl-auto: update
       show-sql: true
 
   # example value

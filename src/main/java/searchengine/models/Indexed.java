@@ -13,8 +13,8 @@ public class Indexed {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "rank", nullable = false)
-    private float rank;
+    @Column(name = "ranking", nullable = false)
+    private float ranking;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "page_id", nullable = false)

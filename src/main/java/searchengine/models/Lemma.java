@@ -27,6 +27,6 @@ public class Lemma {
     @JoinColumn(name = "site_id", nullable = false)
     private Sites site;
 
-    @OneToMany(mappedBy = "lemma", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "lemma", orphanRemoval = true)
     private Set<Indexed> indexes = new HashSet<>();
 }

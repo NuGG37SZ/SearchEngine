@@ -29,6 +29,6 @@ public class Page {
     @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
-    @OneToMany(mappedBy = "page", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "page", orphanRemoval = true)
     private Set<Indexed> indexes = new HashSet<>();
 }

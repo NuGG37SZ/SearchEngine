@@ -16,6 +16,7 @@ public class SitesDto {
     private String url;
     private String name;
     private List<PageDto> pages = new ArrayList<>();
+    private List<LemmaDto> lemmas = new ArrayList<>();
 
     public SitesDto(Status status, LocalDateTime statusTime, String lastError, String url, String name) {
         this.status = status;
