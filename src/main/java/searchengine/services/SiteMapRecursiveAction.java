@@ -87,12 +87,18 @@ public class SiteMapRecursiveAction extends RecursiveAction {
             for (Map.Entry<String, Integer> entry : lemmasMap.entrySet()) {
                 String lemmaStr = entry.getKey();
                 int frequency = entry.getValue();
+                Lemma lemma = lemmaRepository.findByLemma(lemmaStr);
 
-                Lemma lemma = new Lemma();
-                lemma.setLemma(lemmaStr);
-                lemma.setFrequency(frequency);
-                lemma.setSite(site);
-                lemmaRepository.save(lemma);
+                if (lemma != null) {
+                    lemma.setFrequency(lemma.getFrequency() + 1);
+                    lemmaRepository.save(lemma);
+                } else {
+                    lemma = new Lemma();
+                    lemma.setLemma(lemmaStr);
+                    lemma.setFrequency(frequency);
+                    lemma.setSite(site);
+                    lemmaRepository.save(lemma);
+                }
 
                 Indexed indexed = new Indexed();
                 indexed.setPage(page);
