@@ -89,8 +89,7 @@ public class SearchServiceImpl implements SearchService {
                                 .collect(Collectors.toSet());
                     } else {
                         pathPage = pageIds.stream()
-                                .map(pageId -> pageRepository.findById(pageId).orElseThrow().getPath()
-                                        .replaceAll("null", ""))
+                                .map(pageId -> pageRepository.findById(pageId).orElseThrow().getPath())
                                 .collect(Collectors.toSet());
                     }
 
