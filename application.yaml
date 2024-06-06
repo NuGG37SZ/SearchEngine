@@ -16,10 +16,10 @@
 
   indexing-settings:
     sites:
-      - url: https://dombulgakova.ru/
-        name: dombulgakova.ru
-      - url: https://nikoartgallery.com/
-        name: nikoartgallery.com
+    - url: https://www.svetlovka.ru/
+      name: svetlovka.ru
+    - url: https://nikoartgallery.com/
+      name: nikoartgallery.com
 
 
 

@@ -39,28 +39,20 @@ public class SearchServiceImpl implements SearchService {
     }
 
     @Override
-    public SearchResponse search(String query, String site, Integer offset, Integer limit) {
+    public SearchResponse search(String query, String site, Integer offset, Integer limits) {
         try {
             int maxLemmaPageCount = 1000;
-            double maxRelevance = 0.0;
             WordLemmatizer wordLemmatizer = WordLemmatizer.getInstance();
 
             Map<String, Double> pageRelevance = new HashMap<>();
             List<Datas> dataList = new ArrayList<>();
             Map<String, Integer> lemmaMap = new HashMap<>();
             Set<String> lemmas = wordLemmatizer.getLemmaSet(query);
-            Set<String> resultPages = new HashSet<>();
-            Set<String> pathPage;
+            Set<String> resultPages;
 
-            for (String lemma : lemmas) {
-                try {
-                    Lemma lemmaFind = lemmaRepository.findByLemma(lemma);
-                    int countLemma = lemmaFind.getFrequency();
-                    lemmaMap.put(lemma, countLemma);
-                } catch (NullPointerException ex) {
-                    ex.getMessage();
-                }
-            }
+            lemmas.stream()
+                    .map(lemmaRepository::findByLemma)
+                    .forEach(l -> lemmaMap.put(l.getLemma(), l.getFrequency()));
 
             Map<String, Integer> filteredLemmaMap = lemmaMap.entrySet().stream()
                     .filter(entry -> entry.getValue() <= maxLemmaPageCount)
@@ -72,86 +64,49 @@ public class SearchServiceImpl implements SearchService {
                             LinkedHashMap::new
                     ));
 
-            for (Map.Entry<String, Integer> lemmaEntry : filteredLemmaMap.entrySet()) {
-                String lemma = lemmaEntry.getKey();
-                Lemma lemmaFind = lemmaRepository.findByLemma(lemma);
-                if (lemmaFind.getId() != null) {
-                    List<Indexed> indexedList = indexedRepository.findByLemmaId(lemmaFind.getId());
-                    Set<Integer> pageIds = indexedList.stream()
-                            .map(Indexed::getPage)
-                            .map(Page::getId)
-                            .collect(Collectors.toSet());
-
-                    if(site != null) {
-                        pathPage = pageIds.stream()
-                                .map(pageId -> pageRepository.findById(pageId).orElseThrow().getPath())
-                                .filter(path -> path.startsWith(site))
-                                .collect(Collectors.toSet());
-                    } else {
-                        pathPage = pageIds.stream()
-                                .map(pageId -> pageRepository.findById(pageId).orElseThrow().getPath())
-                                .collect(Collectors.toSet());
-                    }
-
-                    if (resultPages.isEmpty()) {
-                        resultPages.addAll(pathPage);
-                    } else {
-                        resultPages.retainAll(pathPage);
-                    }
-
-                    if (resultPages.isEmpty()) {
-                        break;
-                    }
-                }
-            }
+            resultPages = findCommonPagesByLemmas(filteredLemmaMap, site);
 
             for (String pages : resultPages) {
-                double pageRelevanceSum = 0.0;
-                for (Map.Entry<String, Integer> lemmaEntry : filteredLemmaMap.entrySet()) {
-                    String lemma = lemmaEntry.getKey();
-                    Lemma lemmaFind = lemmaRepository.findByLemma(lemma);
-                    Page page = pageRepository.findByPath(pages).orElseThrow();
-
-                    List<Indexed> indexedList = indexedRepository.findByLemmaIdAndPageId(lemmaFind.getId(),
-                            page.getId());
-                    for(Indexed indexed : indexedList) {
-                        float ranking = indexed.getRanking();
-                        pageRelevanceSum += ranking;
-                    }
-                }
-                double normalizedRelevance = pageRelevanceSum / maxRelevance;
+                double normalizedRelevance = calculateRelevance(pages, filteredLemmaMap);
                 pageRelevance.put(pages, normalizedRelevance);
-                maxRelevance = Math.max(maxRelevance, pageRelevanceSum);
             }
 
+            int count = 0;
             for (String pages : resultPages) {
-                Optional<Page> optionalPage = pageRepository.findByPath(pages);
+                if (count >= offset + 1) {
+                    Optional<Page> optionalPage = pageRepository.findByPath(pages);
 
-                if (optionalPage.isPresent()) {
-                    Page page = optionalPage.get();
-                    String title = findTitle(page);
-                    String snippet = findSnippet(page, query);
-                    String uri = page.getPath();
-                    Double relevance = pageRelevance.get(pages);
+                    if (optionalPage.isPresent()) {
+                        Page page = optionalPage.get();
+                        String title = findTitle(page);
+                        String snippet = findSnippet(page, query);
+                        String uri = page.getPath();
+                        Double relevance = pageRelevance.get(pages);
 
-                    Datas data = new Datas();
-                    data.setSite(site);
-                    data.setUri(uri);
-                    data.setTitle(title);
-                    data.setSnippet(snippet);
-                    data.setRelevance(relevance);
+                        Datas data = new Datas();
+                        data.setSite(site);
+                        data.setUri(uri);
+                        data.setTitle(title);
+                        data.setSnippet(snippet);
+                        data.setRelevance(relevance);
 
-                    Optional<Sites> optionalSite = Optional.ofNullable(siteRepository.findByUrl(site));
-                    if (optionalSite.isPresent()) {
-                        Sites siteEntity = optionalSite.get();
-                        data.setSiteName(siteEntity.getName());
-                    } else {
-                        Sites siteFind = page.getSite();
-                        data.setSiteName(siteFind.getName());
-                        data.setSite(siteFind.getUrl());
+                        Optional<Sites> optionalSite = Optional.ofNullable(siteRepository.findByUrl(site));
+                        if (optionalSite.isPresent()) {
+                            Sites siteEntity = optionalSite.get();
+                            data.setSiteName(siteEntity.getName());
+                        } else {
+                            Sites siteFind = page.getSite();
+                            data.setSiteName(siteFind.getName());
+                            data.setSite(siteFind.getUrl());
+                        }
+                        dataList.add(data);
+
+                        if (dataList.size() == limits) {
+                            break;
+                        }
                     }
-                    dataList.add(data);
                 }
+                count++;
             }
             dataList.sort((d1, d2) -> Double.compare(d2.getRelevance(), d1.getRelevance()));
 
@@ -160,6 +115,66 @@ public class SearchServiceImpl implements SearchService {
             ex.printStackTrace();
             return new SearchResponse(false, ex.getMessage(), 0, Collections.emptyList());
         }
+    }
+
+    private Set<String> findCommonPagesByLemmas(Map<String, Integer> filteredLemmaMap, String site) {
+        Set<String> pathPage;
+        Set<String> resultPages = new HashSet<>();
+
+        for (Map.Entry<String, Integer> lemmaEntry : filteredLemmaMap.entrySet()) {
+            String lemma = lemmaEntry.getKey();
+            Lemma lemmaFind = lemmaRepository.findByLemma(lemma);
+            if (lemmaFind.getId() != null) {
+                List<Indexed> indexedList = indexedRepository.findByLemmaId(lemmaFind.getId());
+                Set<Integer> pageIds = indexedList.stream()
+                        .map(Indexed::getPage)
+                        .map(Page::getId)
+                        .collect(Collectors.toSet());
+
+                if (site != null) {
+                    pathPage = pageIds.stream()
+                            .map(pageId -> pageRepository.findById(pageId).orElseThrow().getPath())
+                            .filter(path -> path.startsWith(site))
+                            .collect(Collectors.toSet());
+                } else {
+                    pathPage = pageIds.stream()
+                            .map(pageId -> pageRepository.findById(pageId).orElseThrow().getPath())
+                            .collect(Collectors.toSet());
+                }
+
+                if (resultPages.isEmpty()) {
+                    resultPages.addAll(pathPage);
+                } else {
+                    resultPages.retainAll(pathPage);
+                }
+
+                if (resultPages.isEmpty()) {
+                    break;
+                }
+            }
+        }
+        return resultPages;
+    }
+
+    public double calculateRelevance(String pages, Map<String, Integer> filteredLemmaMap) {
+        double pageRelevanceSum = 0.0;
+        double maxRelevance = 0.0;
+        double normalizedRelevance;
+
+        for (Map.Entry<String, Integer> lemmaEntry : filteredLemmaMap.entrySet()) {
+            String lemma = lemmaEntry.getKey();
+            Lemma lemmaFind = lemmaRepository.findByLemma(lemma);
+            Page page = pageRepository.findByPath(pages).orElseThrow();
+
+            List<Indexed> indexedList = indexedRepository.findByLemmaIdAndPageId(lemmaFind.getId(), page.getId());
+            for (Indexed indexed : indexedList) {
+                float ranking = indexed.getRanking();
+                pageRelevanceSum += ranking;
+            }
+        }
+        maxRelevance = Math.max(maxRelevance, pageRelevanceSum);
+        normalizedRelevance = pageRelevanceSum / maxRelevance;
+        return normalizedRelevance;
     }
 
     private String findSnippet(Page page, String query) {

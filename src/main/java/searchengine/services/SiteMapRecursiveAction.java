@@ -1,11 +1,14 @@
 package searchengine.services;
 
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import searchengine.config.Site;
+import searchengine.config.SitesList;
 import searchengine.enums.Status;
 import searchengine.models.Indexed;
 import searchengine.models.Lemma;
@@ -25,6 +28,7 @@ import java.util.concurrent.RecursiveAction;
 import static java.lang.Thread.sleep;
 
 @Slf4j
+@AllArgsConstructor
 public class SiteMapRecursiveAction extends RecursiveAction {
     private final Sites site;
     private final String url;
@@ -33,19 +37,6 @@ public class SiteMapRecursiveAction extends RecursiveAction {
     private final LemmaRepository lemmaRepository;
     private final IndexedRepository indexedRepository;
     private final ConcurrentSkipListSet<String> processedLinks;
-
-    public SiteMapRecursiveAction(Sites site, String url, PageRepository pageRepository,
-                                  SiteRepository siteRepository, ConcurrentSkipListSet<String> processedLinks,
-                                  LemmaRepository lemmaRepository, IndexedRepository indexedRepository)
-    {
-        this.site = site;
-        this.url = url;
-        this.pageRepository = pageRepository;
-        this.siteRepository = siteRepository;
-        this.processedLinks = processedLinks;
-        this.lemmaRepository = lemmaRepository;
-        this.indexedRepository = indexedRepository;
-    }
 
     @Override
     protected void compute() {
@@ -115,7 +106,7 @@ public class SiteMapRecursiveAction extends RecursiveAction {
                 if (!link.contains("#") && !isFile(link) && link.startsWith(site.getUrl()) &&
                         !processedLinks.contains(link) && element.tagName().equals("a")) {
                     SiteMapRecursiveAction siteMapRecursiveAction = new SiteMapRecursiveAction(site, link,
-                            pageRepository, siteRepository, processedLinks, lemmaRepository, indexedRepository);
+                            pageRepository, siteRepository, lemmaRepository, indexedRepository, processedLinks);
                     siteMapRecursiveAction.fork();
                     taskList.add(siteMapRecursiveAction);
                 }
@@ -142,6 +133,7 @@ public class SiteMapRecursiveAction extends RecursiveAction {
                 absLink.contains(".eps") || absLink.contains(".xlsx") || absLink.contains(".doc") ||
                 absLink.contains(".pptx") || absLink.contains(".docx") || absLink.contains("?_ga");
     }
+
 }
 
 

@@ -1,10 +1,10 @@
 package searchengine.services;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.select.Elements;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
@@ -21,17 +21,16 @@ import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 
-import static java.lang.Thread.sleep;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SiteServiceImpl implements SiteService {
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
@@ -39,50 +38,50 @@ public class SiteServiceImpl implements SiteService {
     private final LemmaRepository lemmaRepository;
     private final IndexedRepository indexedRepository;
     private final IndexResponse response = new IndexResponse();
-    private final ForkJoinPool forkJoinPool = new ForkJoinPool();
-
-    public SiteServiceImpl(SiteRepository siteRepository, PageRepository pageRepository,
-                           SitesList sitesList, LemmaRepository lemmaRepository, IndexedRepository indexedRepository)
-    {
-        this.siteRepository = siteRepository;
-        this.pageRepository = pageRepository;
-        this.lemmaRepository = lemmaRepository;
-        this.indexedRepository = indexedRepository;
-        this.sitesList = sitesList;
-    }
+    private ForkJoinPool forkJoinPool = new ForkJoinPool();
 
     @Override
     public IndexResponse indexSite() {
-        List<Sites> siteList = new ArrayList<>();
+        try {
+            List<Sites> siteList = new ArrayList<>();
 
-        for (Site site : sitesList.getSites()) {
-            Sites sites = siteRepository.findByUrl(site.getUrl());
-
-            if (sites != null) {
-                siteRepository.delete(sites);
+            if (forkJoinPool.isTerminated()) {
+                forkJoinPool = new ForkJoinPool();
             }
 
-            Sites newSites = new Sites();
-            newSites.setUrl(site.getUrl());
-            newSites.setName(site.getName());
-            newSites.setLastError(null);
-            newSites.setStatus(Status.INDEXED);
-            newSites.setStatusTime(LocalDateTime.now());
-            siteList.add(newSites);
-        }
-        siteRepository.saveAll(siteList);
+            for (Site site : sitesList.getSites()) {
+                Sites sites = siteRepository.findByUrl(site.getUrl());
 
-        for (Sites sites : siteList) {
-            if (!forkJoinPool.isShutdown() && !forkJoinPool.isTerminating()) {
-                ConcurrentSkipListSet<String> processedLinks = new ConcurrentSkipListSet<>();
-                SiteMapRecursiveAction task = new SiteMapRecursiveAction(sites, sites.getUrl(), pageRepository,
-                        siteRepository, processedLinks, lemmaRepository, indexedRepository);
-                forkJoinPool.execute(task);
+                if (sites != null) {
+                    siteRepository.delete(sites);
+                }
+
+                Sites newSites = new Sites();
+                newSites.setUrl(site.getUrl());
+                newSites.setName(site.getName());
+                newSites.setLastError(null);
+                newSites.setStatus(Status.INDEXED);
+                newSites.setStatusTime(LocalDateTime.now());
+                siteList.add(newSites);
             }
+            siteRepository.saveAll(siteList);
+
+            for (Sites sites : siteList) {
+                if (!forkJoinPool.isShutdown() && !forkJoinPool.isTerminating()) {
+                    ConcurrentSkipListSet<String> processedLinks = new ConcurrentSkipListSet<>();
+                    SiteMapRecursiveAction task = new SiteMapRecursiveAction(sites, sites.getUrl(), pageRepository,
+                            siteRepository, lemmaRepository, indexedRepository, processedLinks);
+                    forkJoinPool.execute(task);
+                }
+            }
+            response.setError("");
+            response.setResult(true);
+            return response;
+        } catch (Exception ex) {
+            response.setError(ex.getMessage());
+            response.setResult(false);
+            return response;
         }
-        response.setError("");
-        response.setResult(true);
-        return response;
     }
 
     @Override
@@ -176,7 +175,5 @@ public class SiteServiceImpl implements SiteService {
         }
         return response;
     }
-
-
 }
 
